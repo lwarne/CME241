@@ -13,28 +13,18 @@ SASf = Mapping[S, Mapping[A, Mapping[S, float]]]
 
 def SASTff_to_SASf(
     info: SASTff     
-) -> Tuple( SASf, SASf ):
-    P = { s : {a : { sp, prob for sp, (prob,_) in inner2.items() } for a, inner2 in inner1.items()  } s, inner1 in info.items() }
-    R = { s : {a : { sp, r for sp, (_,r) in inner2.items() } for a, inner2 in inner1.items()  } s, inner1 in info.items() }
+) -> Tuple[ SASf, SASf ]:
+    P = { s : {a : { sp : prob for sp, (prob,_) in inner2.items() }  \
+            for a, inner2 in inner1.items()  } for s, inner1 in info.items() }
+    R = { s : {a : { sp : r for sp, (_,r) in inner2.items() } \
+            for a, inner2 in inner1.items()  } for s, inner1 in info.items() }
     return (P,R)
 
 def s2i(
     l : str
 ) -> int:
-    return ord(l)-97
-
-def SASf_to_3d(
-    map: SASf
-) -> np.ndarray:
-    s = len(list(map.keys()))
-    M = np.zeros(s,s,s)
-    for s in list(map.keys()):
-        for a in list(map[s].keys()):
-            for sp in list(map[s][a].keys()):
-                M(s-1, s2i, sp-1) = map[s][a][sp]
-
-
-
+    """ ord('a') = 97 """
+    return ord(l)-97 
 
 class MDP():
 
@@ -44,8 +34,8 @@ class MDP():
     R_matrix: np.ndarray #reward matrix
     P_matrix: np.ndarray #transiton matrix 
     gamma: float
-    state_list : List[S]
-    action_set : Set[A]
+    state_list : List[S]    #list of states
+    action_set : Set[A]     #list of actions
 
     
     def __init__(
@@ -54,16 +44,31 @@ class MDP():
         gamma: float
     ) -> None:
         #split and assign
-        P_R = SASTff_to_SASf
-        self.R_map = P_R[0]
-        self.P_map = P_R[1]
+        P_R = SASTff_to_SASf(data)
+        self.R_map = P_R[1]
+        self.P_map = P_R[0]
 
         #extract states
-        state_list = get_states(self.P_map)
-        
+        self.state_list = self.get_states(self.P_map)
+        #extract actions
+        self.action_set = self.get_actions(self.P_map)
         #convert to matrix (s,sp,a)
-         
-
+        self.R_matrix = self.SASf_to_3d( self.R_map )
+        self.P_matrix = self.SASf_to_3d( self.P_map )
+            
+    def SASf_to_3d(
+        self,
+        map: SASf
+    ) -> np.ndarray:
+        snum = len(self.state_list)
+        anum = len(self.action_set)
+        print(snum, anum)
+        M = np.zeros((snum,snum,anum))
+        for s in list(map.keys()):
+            for a in list(map[s].keys()):
+                for sp in list(map[s][a].keys()):
+                    M[s-1, sp-1, s2i(a)] = map[s][a][sp]
+        return M
 
     def get_states(
         self,
@@ -72,13 +77,14 @@ class MDP():
         return list(data.keys())
 
     def get_actions(
-        self
+        self,
         data: SASf
     ) -> Set[A]:
         aset = set()
         for s in list(data.keys()):
-            for a in list(data[s].keys())
+            for a in list(data[s].keys()):
                 aset.add(a)
+        return aset
 
 
 if __name__ == '__main__':
@@ -99,3 +105,11 @@ if __name__ == '__main__':
             'b': {3: (1.0, 0.0)}
         }
     }
+    mdp = MDP(mdp_refined_data,.9)
+    print( "R map {}".format(mdp.R_map) )
+    print( "R matrix {}".format(mdp.R_matrix) )
+    print( "P map {}".format(mdp.P_map) )
+    print( "P matrix {}".format(mdp.P_matrix) )
+    print( "P matrix action a {}".format(mdp.P_matrix[:,:,0]) )
+    print( "state_list {}".format(mdp.state_list) )
+    print( "action set {}".format(mdp.action_set) )
