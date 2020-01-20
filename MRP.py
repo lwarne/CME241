@@ -1,41 +1,72 @@
-from typing import Mapping, Set, Sequence, Tuple
-from MPv2.py import MP
+from typing import Mapping, Set, Sequence, Tuple, TypeVar, List
+from MPv2 import MP
 import numpy as np
+
+#declare the generic State and Action types
+S = TypeVar('S')
+A = TypeVar('A')
 
 STSff = Mapping[S, Tuple[Mapping[S, float], float]]
 SSTff = Mapping[S, Mapping[S, Tuple[float, float]]]
-Sf =  Mapping[S, float]]
+Sf =  Mapping[S, float]
+#declare the transition matrix type
+SSf = Mapping[S, Mapping[S, float]]
+
+
 
 def SSTff_to_SSf_Sf(
     info: SSTff
-) -> Tuple[ Mapping[S, Mapping[S,f]], Mapping[S,f] ] :
+) -> Tuple[ SSf, SSf ] :
     P = {s : {sp : prob for sp, (prob,_) in innerdict.items() } for s, innerdict in info.items()  }
     Rssp = {s : {sp : r for sp, (_,r) in innerdict.items() } for s, innerdict in info.items()  }
-    return (P, Rssp  )
+    return (P, Rssp )
 
 
 def STSff_to_SSf(
     info: STSff
 ) -> SSf :
-    return {k : P for k, (P, _) for info.items()}
+    return {k : P for k, (P, _) in info.items()}
 
 def STSff_to_Sf(
     info: STSff
 ) -> Sf :
-    return {k : r for k, (P, r) for info.items()}
+    return {k : r for k, (P, r) in info.items()}
 
-class MRP_Rs(MP):
+class MRP(MP):
 
     #member variables
+    Rss_map : SSf   #rewards SSf
+    Rs : List[float] #reward vector
+    Rss_matrix : np.ndarray #reward matrix
+    #inheriteds
+    # state_list: List[S] = None      #list of states
+    # P_map: SSf = None               #transition mapping
+    # P_matrix: np.ndarray = None     #transition matrix
     
 
     def __init__(
         self,
-        state_P_R : STSff
+        state_P_R : STSff,
+        gamma : float
     ) -> None:
         #initalize the underlying MP
-        super().__init__( STSff_to_SSf(state_P_R) )
-        #initalize the 
+        P_R = SSTff_to_SSf_Sf(state_P_R)
+        super().__init__( P_R[0] )
+        #initalize the reward vector
+        self.Rss_map = P_R[1]
+        self.Rss_matrix = self.convert_to_matrix(self.Rss_map)
+        self.gamma = gamma
+        self.Rs = self.get_Rs()
+    
+    def get_Rs(
+        self
+    ) -> List[float]:
+        #matrix multiply
+        M = np.multiply(self.P_matrix, self.Rss_matrix)
+        #sum across s'
+        Rs = np.sum(M, axis=1)
+        return list(Rs)
+
 
 if __name__ == '__main__':
     #SSTff
@@ -51,11 +82,15 @@ if __name__ == '__main__':
     #     3: ({3: 1.0}, 0.0)
     # }
     mrp_obj = MRP(data, 1.0)
-    print(mrp_obj.trans_matrix)
-    print(mrp_obj.rewards_vec)
-    terminal = mrp_obj.get_terminal_states()
-    print(terminal)
-    value_func_vec = mrp_obj.get_value_func_vec()
-    print(value_func_vec)
+    print("trans matrix")
+    print(mrp_obj.P_matrix)
+    print("trans map")
+    print(mrp_obj.P_map)
+    print("state list")
+    print(mrp_obj.state_list)
+    print("Rss matrix")
+    print(mrp_obj.Rss_matrix)
+    print("Rs")
+    print(mrp_obj.Rs)
 
 
