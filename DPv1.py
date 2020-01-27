@@ -57,9 +57,6 @@ class DP:
                     #get the reward
                     reward = self.world.R_map[s][a][sp]
 
-                    #get the previous value
-                    val_sp = vfk[sp]
-
                     #update vf
                     new_vf[s] += policy[s][a] * prob * (reward + self.world.gamma * vfk[sp])
  
@@ -105,9 +102,120 @@ class DP:
 
             #update counter
             count += 1
-            print("iter {}, max diff {}:\n  value function: {} ".format(count,max_diff,new_vf) )
+            #print("iter {}, max diff {}:\n  value function: {} ".format(count,max_diff,new_vf) )
         
         return new_vf
+
+
+    # def get_state_action_vf_from_state_vf(
+    #     self,
+    #     vf: Sf
+    # ) -> SAf:
+    #     cacluate the state action value function 
+
+    def greedy_policy_improvement(
+        self,
+        vf: Sf
+    ) -> SAf:
+        """ greedily improve the policy by choosing the best action for each state """
+        #for each state, calculate the value of each actions
+
+        #define the tracking SAf
+        tracker = dict()
+
+        #given a state calcualte the state action value function 
+        for s in self.world.state_list:
+            
+            #set up internal dict
+            tracker[s] = dict()
+
+            #sum over actions
+            for a in list(self.world.P_map[s].keys()):
+                
+                #initalize action key in internal dict
+                tracker[s][a] = 0
+
+                #for each s' get the transition prob and caluc expected value 
+                for sp, prob in self.world.P_map[s][a].items():
+                    
+                    #get the reward
+                    reward = self.world.R_map[s][a][sp]
+
+                    #get the value
+                    val_sp = vf[sp]
+
+                    #update tracker
+                    tracker[s][a] += prob * (reward + self.world.gamma * val_sp)
+        
+        #now choose the action with the highest value 
+        # TODO: split probs if equal
+
+        #declare new policy SAf
+        new_pol = {s, dict() for s in self.world.state_list}
+
+        #loop through states and choose best action
+        for s in self.world.state_list:
+
+            #choose best action
+            best_action = None
+
+            #loop through actions
+            for a, val in tracker[s].items():
+                
+                #set best action if not set
+                if best_action = None:
+                    best_action = (a, val)
+                else: #replace with new best action
+                    if val > best_action[1]:
+                        best_action = (a,val)
+            
+            #update policy dictionary to take best action (deterministic now)
+            new_pol[s][a] = 1.0
+        
+        return new_pol
+    
+
+    def policy_iteration(
+        self,
+        policy: SAf,
+        max_iter: Optional[int] = 1000
+    ) -> List[Sf, SAf]: #return optimal value function and policy
+        """ see book for implimentation """
+        #set up 
+        count = 0
+        changed = True
+        old_pol = policy
+        #start iterating baby
+        while (count <= max_iterm and changed ):
+
+            #first perform policy evaluation
+            evaluated = self.policy_evaluation(policy)
+
+            #then improve policy 
+            improved_pol = greedy_policy_improvement( evaluated )
+
+            #then compare
+            # DESIGN AND CALL COMPARE POLICY
+            for s in list(old_pol.keys()):
+                for a, v in old_pol[s].items():
+                    
+                    #get value in new policy 
+                    if( (a in improved_pol[s]) and (v != 0) ):
+
+            #BREAK IF POLICY IS SAME
+
+
+
+
+
+
+                
+        
+
+
+
+                        
+        
 
 
 if __name__ == '__main__':
