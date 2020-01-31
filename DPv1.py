@@ -104,6 +104,7 @@ class DP:
             count += 1
             #print("iter {}, max diff {}:\n  value function: {} ".format(count,max_diff,new_vf) )
         
+        print("     {} policy eval iterations".format(count))
         return new_vf
 
 
@@ -151,7 +152,7 @@ class DP:
         # TODO: split probs if equal
 
         #declare new policy SAf
-        new_pol = {s, dict() for s in self.world.state_list}
+        new_pol = {s: dict() for s in self.world.state_list}
 
         #loop through states and choose best action
         for s in self.world.state_list:
@@ -163,7 +164,7 @@ class DP:
             for a, val in tracker[s].items():
                 
                 #set best action if not set
-                if best_action = None:
+                if best_action == None:
                     best_action = (a, val)
                 else: #replace with new best action
                     if val > best_action[1]:
@@ -178,17 +179,20 @@ class DP:
         self,
         policy: SAf,
         max_iter: Optional[int] = 1000
-    ) -> List[Sf, SAf]: #return optimal value function and policy
+    ) -> Tuple[Sf, SAf]: #return optimal value function and policy
         """ see book for implimentation """
         #set up 
         count = 0
         changed = True
         old_pol = policy
         #start iterating baby
-        while (count <= max_iterm and changed ):
+        while (count <= max_iter and changed ):
+            print("policy iteration: {}".format(count))
 
             #first perform policy evaluation
-            evaluated = self.policy_evaluation(policy)
+            evaluated = self.policy_evaluation(old_pol)
+
+            print("     v_pi: {}".format(evaluated))
 
             #then improve policy 
             improved_pol = self.greedy_policy_improvement( evaluated )
@@ -196,9 +200,13 @@ class DP:
             #then compare
             if self.policy_compare(old_pol, improved_pol):
                 changed = False
+            
+            #move around and add to count 
+            old_pol = improved_pol
+            count+=1
         
         #return the optimal value function and policy
-        return [evaluated, improved_pol]
+        return (evaluated, improved_pol)
 
     
     def policy_compare(
@@ -227,20 +235,73 @@ class DP:
         #if we get here without returning false, they must be the same
         return True
 
-    def check(self) -> bool:
-        return True
+    def value_iteration(
+        self,
+        eval_steps: Optional[int] = 1,     #number of policy evaluation steps to include
+        max_iter: Optional[int] = 1000
+        #consider adding a starting guess for the value function
+    ) -> Tuple[Sf, SAf]:
+        """ Start with a 0 vector value function """
         
+        #start with a zero value function
+        vf_old = {s: 0.0 for s in self.world.state_list}
+        vf_new = {s: 0.0 for s in self.world.state_list}
 
+        #set up control variables
+        max_diff = 1000
+        count = 0
+        #loop until convergence or max iter
+        while( max_diff > self.tol and count < max_iter ):
 
-
-
+            #loop through each state
+            for s in self.world.state_list:
                 
+                #track maximum action value pair
+                best_action = None
+
+                #loop through actions in each state
+                for a in list(self.world.P_map[s].keys())
+
+                    #tract weighted reward across states
+                    this_actions_value = 0.0
+
+                    #for each s' get the transition prob
+                    for sp, prob in self.world.P_map[s][a].items():
+
+                        #get the reward
+                        reward = self.world.R_map[s][a][sp]
+
+                        #increment reward 
+                        this_actions_value += prob * (reward + self.world.gamma * vf_old[sp])
+
+                    #update best action
+                    if (best_action == None):
+                        best_action = (a, this_actions_value)
+                
+                #update the value function
+                vf_new[s] = best_action[1]
+
+                #add to count
+                count += 1
+            
+            #compare value functions
+            max_diff = self.max_diff_dict(vf_old, vf_new)
+
+            #move around
+            vf_old = vf_new
         
+        #after converging
+        return vf_new
+        #TODO return policy from the action, look at be action check from the internal dict
+            
 
 
 
-                        
-        
+
+
+                    
+
+
 
 
 if __name__ == '__main__':
@@ -268,3 +329,8 @@ if __name__ == '__main__':
     mdp1_obj = MDP(mdp_refined_data, gamma_val)
     dp_obj = DP(mdp1_obj, 1e-3)
     value_func = dp_obj.policy_evaluation(policy_data)
+    optimal_vf, optimal_pol = dp_obj.policy_iteration(policy_data)
+    print("Optimal value function: \n {}".format(optimal_vf))
+    print("Optimal policy: \n {}".format(optimal_pol))
+    ## CHECK OUTPUT AGAINST SAME MDP IN ASHWINS code
+
