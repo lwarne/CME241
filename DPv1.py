@@ -174,7 +174,6 @@ class DP:
         
         return new_pol
     
-
     def policy_iteration(
         self,
         policy: SAf,
@@ -192,19 +191,45 @@ class DP:
             evaluated = self.policy_evaluation(policy)
 
             #then improve policy 
-            improved_pol = greedy_policy_improvement( evaluated )
+            improved_pol = self.greedy_policy_improvement( evaluated )
 
             #then compare
-            # DESIGN AND CALL COMPARE POLICY
-            for s in list(old_pol.keys()):
-                for a, v in old_pol[s].items():
+            if self.policy_compare(old_pol, improved_pol):
+                changed = False
+        
+        #return the optimal value function and policy
+        return [evaluated, improved_pol]
+
+    
+    def policy_compare(
+        self,
+        A:  SAf,
+        B:  SAf
+    ) -> bool:
+        """ return true if the policies are the same 
+            uses that prob of all actions given state must sum to 1, only check one direction"""
+        #look at all states in one
+        for s in list(A.keys()):
+
+            #look at action, probability pair in the old policy
+            for a, av in A[s].items():
                     
-                    #get value in new policy 
-                    if( (a in improved_pol[s]) and (v != 0) ):
+                #get value in new policy 
+                if( (a in B[s]) ):
+                    bv = B[s][a]
+                    #compare probabilties. If they are not the same return false
+                    if (av != bv):
+                        return False
+                #if A has a probability of action a in state s but b does not, return false
+                elif av != 0.0:
+                    return False
+    
+        #if we get here without returning false, they must be the same
+        return True
 
-            #BREAK IF POLICY IS SAME
-
-
+    def check(self) -> bool:
+        return True
+        
 
 
 
