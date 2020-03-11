@@ -2,6 +2,7 @@ import numpy as np
 from typing import Mapping, Set, Sequence, Tuple, TypeVar, List
 from scipy.stats import norm
 from itertools import product
+from scipy.stats import lognorm
 
 ##Goal is to build an MDP that allows for dynamic programming
 
@@ -91,19 +92,20 @@ class Merton:
         #sd_end = np.sqrt(varT)
         ##TRY 1
         sd_end = np.sqrt(sigma_sq) * np.sqrt(self.T)
+        print("sd_end: {}".format(sd_end))
         # print("sd_end {}".format(sd_end))
         # max_wealth =  W_0 + int(4*sd_end * W_0) #KEY VARIABLE, RANGE OF WEALTH STATES
         # min_wealth = max(0,W_0 - (max_wealth - W_0))
         ##TRY2
-        max_wealth = W_0 * ((1+mu)**T) + 2*sd_end
-        min_wealth = max(0,W_0 - (max_wealth - W_0))
+        max_wealth = W_0 * lognorm.ppf(.9995,s = sd_end)
+        min_wealth = W_0 * lognorm.ppf(.0005,s = sd_end)
         W_states_count = int( np.max( np.array([min_num_states, max_wealth / wealth_steps ]) ) )
 
         #set up state matrix
         self.S_rows = np.arange(0,T+1)
         self.S_cols = np.linspace(min_wealth,max_wealth,W_states_count)
-        print("min wealth {} max wealth {}".format(min_wealth,max_wealth))
-        print("S_cols 1 {}".format(self.S_cols))
+        #print("min wealth {} max wealth {}".format(min_wealth,max_wealth))
+        #print("S_cols 1 {}".format(self.S_cols))
         self.S_value = np.zeros((self.S_rows.size,  self.S_cols.size ))
         self.gap = self.S_cols[1] - self.S_cols[0]
         self.max_wealth = int(self.S_cols[-1:])
@@ -188,7 +190,7 @@ class Merton:
         ])
         #adjust first and last.
         wealth_probs[0] += norm.cdf(( self.min_wealth - .5*self.gap - (1+self.rf)*(1-a)*W - a*W ) /(a*W), self.mu, self.sigma  ) 
-        wealth_probs[-1:] += 1 -  np.sum(wealth_probs)
+        wealth_probs[-1:] += 1 - np.sum(wealth_probs)
         # print("wealth probs: {}".format(wealth_probs))
         # print("sum wealth probs: {}".format(np.sum(wealth_probs)))
 
@@ -219,7 +221,8 @@ class Merton:
             # print("cols {}",format(self.S_cols))
             # print("exp(-gamma*w) {}".format(np.exp(- self.gamma * self.S_cols)))
             # print("1 - exp(-gamma*w) {}".format(1 -np.exp(- self.gamma * self.S_cols)))
-            return (1 - np.exp(- self.gamma * self.S_cols)) / self.gamma  
+            return (1-np.exp(-self.gamma* self.S_cols ))/self.gamma
+            #return (1 - np.exp(- self.gamma * self.S_cols)) / self.gamma  
 
 
     #next, value iteraton:
@@ -236,8 +239,8 @@ class Merton:
         vf_new = np.zeros( (self.S_rows.size,  self.S_cols.size) )
 
         #set up control variables
-        tol = 1e-3
-        max_iter = 100
+        tol = 1e-5
+        max_iter = 1000
         max_diff = 1000
         count = 0
 
@@ -281,60 +284,150 @@ class Merton:
             if verbose == True:
                 print("iter {} \n    max diff: {} \n    ".format(count, max_diff))
         
-        #return
+        #store details
+        self.S_value = vf_new
+
+        #return state value matrix
         return vf_new
+    
+    def extract_optimal_policy(
+        self
+    ) -> np.ndarray:
+        """ returns the optimal action in matrix T x W format, same as value iteration
+        """
+        #debug
+
+        if (np.array_equal(self.S_value, np.zeros( (self.S_rows.size,  self.S_cols.size) ) )):
+            self.value_iteration( verbose = False )
+
+        r = int(self.T/2)
+        c = int(self.num_wealth_states/2)
+
+        check = np.array([
+                        #no rewards taken into account 
+                        np.dot( self.pre_computed_trans(self.S_cols[c],a ) 
+                        ,self.rho * self.S_value[self.S_rows[min(self.T,r+1)],:])
+                        for a in self.A_set
+        ])
+
+        
+
+        print("r: {}, c: {}, prob do value : \n {}".format(r,c,check))
+
+        #loop through states
+        opt_pol = np.array([
+            self.A_set[ #index into the action set
+                np.argmax(
+                    np.array([
+                        #no rewards taken into account 
+                        np.dot( self.pre_computed_trans(self.S_cols[c],a ) 
+                        ,self.rho * self.S_value[self.S_rows[min(self.T,r+1)],:])
+                        for a in self.A_set
+                    ])
+                )
+            ]
+            #for each t,W state
+            for r,c in product(np.arange(self.S_rows.size),np.arange(self.S_cols.size) )
+        ])
+
+        #reshape to matrix
+        opt_pol = opt_pol.reshape(self.S_rows.size,self.S_cols.size)
+
+        return opt_pol
+    
+    def rl_interface(
+        self,
+        t: int,
+        W: float,
+        a: float
+    ) -> Tuple[int, float, float]:
+        """ takes time, wealth, and action
+            returns the next state (time, wealth) and the reward (float)
+        """
+        #identify the index of action and wealth
+        a_ind = np.argmin(np.abs(self.A_set - a))
+        w_ind = np.argmin(np.abs(self.S_cols - W))
+
+        #get wealth transition
+        #print("transition probs @ w {} a {}: \n {}".format(W,a,self.trans_probs[a_ind,w_ind,:]))
+        new_w = np.random.choice(self.S_cols,p = self.trans_probs[a_ind,w_ind,:] )
+
+        #get reward
+        R = 0.0
+        if t == self.T-1:
+            R = (1-np.exp(-self.gamma* new_w ))/self.gamma
+
+        return [ t+1, new_w, R ]
+
+    
+
+
+        
 
 
 if __name__ == '__main__':
-    t = 10
+    t = 5
+    gamma = .01
+    mu = .05
+    rf = .03
+    sigma_sq = .05
+
+    # analytical = np.array([ (mu-rf)/ (sigma_sq * gamma * (1+rf))**(t-time-1)
+    #     for time in np.arange(t)
+    # ])
+
+    # denom = np.array([ (sigma_sq * gamma * (1+rf))**(t-time-1)
+    #     for time in np.arange(t)
+    # ])
+
+    # print("analytical : {}".format(analytical))
+    # print("denom : {}".format(denom))
     #initalize 
     M = Merton(
         T = t, 
-        rho = .5,
-        rf = .005,
-        mu = .02,
-        sigma_sq = .005, #bad design!
+        rho = .95,
+        rf = rf,
+        mu = mu,
+        sigma_sq = sigma_sq, #bad design!
         sigma = .1, #not used
-        gamma = .01,
-        min_num_states = 50,
-        wealth_steps = 10,
-        num_actions = 6,
+        gamma = gamma,
+        min_num_states = 125,
+        wealth_steps = 10, #not used
+        num_actions = 11,
         action_range = (0.0,1.0),
-        W_0 = 100.0
+        W_0 = 50.0
     )
 
-    print("max wealth: {} \n steps: {} \n gap: {} ".format( 
-            M.max_wealth, M.num_wealth_states, M.gap ))
-    print("action set {}".format(M.A_set))
-    print( "initalized correctly")
+    # print("max wealth: {} \n steps: {} \n gap: {} ".format( 
+    #         M.max_wealth, M.num_wealth_states, M.gap ))
+    # print("action set {}".format(M.A_set))
+    # print( "initalized correctly")
     
-    #run transition probs
-    prob = M.transition_prob(1, M.S_cols[int(M.num_wealth_states/2)],1)
-    prob = M.transition_prob(t, M.S_cols[int(M.num_wealth_states/2)] ,.4)
-    #print(prob)
-    #test rewards
-    #reward = M.reward_at_t(1)
-    #print(reward)
-    reward = M.reward_at_t(t)
-    print("reward:",reward)
+    # #run transition probs
+    # prob = M.transition_prob(1, M.S_cols[int(M.num_wealth_states/2)],1)
+    # prob = M.transition_prob(t, M.S_cols[int(M.num_wealth_states/2)] ,.4)
+    # #print(prob)
+    # #test rewards
+    # #reward = M.reward_at_t(1)
+    # #print(reward)
+    # reward = M.reward_at_t(t)
+    # print("reward:",reward)
 
-    #reward check
-    print("S_cols: \n  {}".format(M.S_cols))
-    print( (1 - np.exp(- .01 * M.S_cols)) / .01 )
+    # #reward check
+    # print("S_cols: \n  {}".format(M.S_cols))
 
-    np.set_printoptions(precision=1,suppress=True)
-    #test value iteration
-    val = M.value_iteration()
-    
-    #print(val.shape)
-    print(val)
+    # np.set_printoptions(precision=1,suppress=True,edgeitems = 20)
+    # #test value iteration
+    # val = M.value_iteration(verbose=True)
+    # print(val)
 
-    
-    ### Next steps
-    # 1) get my shit together and figure out the log normal distribution to bound the wealth
-    # 2) extract optimal policy
-    # 3) vary paramaters and observe direction changes in optimal policy align with analytical solution
-    # 4) START THE FUCK RL ALGO 
+    #test optimal policy extraction
+    pol = M.extract_optimal_policy()
+    print("Optimal Policy: \n {}".format(pol))
+    #save to text
+    #np.savetxt('test3.csv', pol, delimiter=',')
+    # looks fine
+
 
 
 
