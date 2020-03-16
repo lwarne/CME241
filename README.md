@@ -1,7 +1,7 @@
 # CME241
 Learning RL through code.
 
-## Write up
+# Write up
 
 Week 1 writing: https://www.overleaf.com/read/hwtvstrgvxnr
 
@@ -11,15 +11,15 @@ Optimal allocation in discrete time: https://www.overleaf.com/read/bymzjtfzxqjg
 
 Post Midterm writeup: https://www.overleaf.com/read/fdvrbhzxvhdb
 
-## Code
-# MRP and DP Code
+# Code
+## MRP and DP Code
 **DPv1.py**
 value and policy iteration based on a MDP
 
 **MDP.py, MRP.py, MPv2.py**
 MDP, MRP, and MP code
 
-# Application Code
+## Application Code
 
 **MertonProblemMDP.py**
 Dynamic programming and sampling interface for RL
