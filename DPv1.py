@@ -292,7 +292,7 @@ class DP:
         
         #after converging
         return vf_new
-        #TODO return policy from the action, look at be action check from the internal dict
+        #TODO return policy from the action, look at best action check from the internal dict
             
 
 

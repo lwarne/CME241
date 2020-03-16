@@ -64,7 +64,7 @@ class MDP():
     ) -> np.ndarray:
         snum = len(self.state_list)
         anum = len(self.action_set)
-        print(snum, anum)
+        #print(snum, anum)
         M = np.zeros((snum,snum,anum))
         for s in list(map.keys()):
             for a in list(map[s].keys()):
@@ -139,7 +139,7 @@ class MDP():
             for t in delete_list:
                 del data[t[0]][t[1]]
         
-        #transform data to have inner tuples
+        #transform data to have inner tuples instead of lists
         mrp_SSTff = { s: { sp : (l[0],l[1]) for sp,l in lvl1.items() } \
             for s,lvl1 in data.items() }
         #feed into MRP constructor
