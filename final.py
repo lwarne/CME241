@@ -225,6 +225,61 @@ def get_lstd_value_function(
     is an indicator variables for a corresponding state and each parameter is
     the value function for the corresponding state.
     """
+    #need to work with matrices again. 
+    #note sutton-barto book which states "x(terminal) = 0"
+
+    #get states, set up date value
+    state_value = {tup[0]:0 for tup in srs_samples }
+    states_list = list(state_value)
+    n = len(states_list)
+    # print(n)
+
+    #set up formula components
+    M = np.zeros((n,n))
+    v = np.zeros((n,1))
+
+    #loop through all observations, to find the number of state s
+    for tup in srs_samples:
+        #extract info from sample
+        s = tup[0]
+        r = tup[1]
+        sp = tup[2]
+
+        ##outer product
+        #first vector
+        xs = np.zeros(n)
+        xs[states_list.index(s)] = 1
+        xs = xs.reshape((n,1))
+        #second vector
+        xsp = np.zeros(n)
+        if sp in states_list:
+            xsp[states_list.index(sp)] = 1
+        xsp = xsp.reshape((n,1))
+        # outer produce
+        temp = np.matmul(xs , (xs.T-xsp.T)) 
+        #add to M
+        M += temp
+
+        # print(s,sp)
+        # print("xs: \n",xs)
+        # print("xsp: \n",xsp)
+        # print("temp: \n",temp)
+        # print("temp shape",temp.shape)
+        # print("M: \n",M)
+
+        ## reward vector sum
+        v += xs * r
+        # print("v: \n",v)
+    
+    #now computer the feature vector, in tabular also the state value function
+    value = np.linalg.inv( M ) @ v
+
+    #convert to dictionary again
+    value_dict = { states_list[i][0]: float(value[i]) for i in range(n) }
+    #value_dict["T"] = 0
+    
+    return value_dict
+
 
 
 if __name__ == '__main__':
@@ -250,5 +305,5 @@ if __name__ == '__main__':
     print("------------- TD VALUE FUNCTION --------------")
     print(get_td_value_function(srs_samps))
 
-    # print("------------- LSTD VALUE FUNCTION --------------")
-    # print(get_lstd_value_function(srs_samps))
+    print("------------- LSTD VALUE FUNCTION --------------")
+    print(get_lstd_value_function(srs_samps))
